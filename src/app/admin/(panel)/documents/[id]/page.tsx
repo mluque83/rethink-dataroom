@@ -48,6 +48,11 @@ export default async function DocumentPage({ params, searchParams }: { params: P
         {versions.map((v) => {
           const f = files.find((x) => x.id === v.originalFileId);
           const rep = (v.conversionReport ?? {}) as { error?: string; fidelity?: { coverage: number; missingSample: string[] }; fidelityReasons?: string[]; validation?: { warnings: string[] }; uploadWarnings?: string[] };
+          if (["rejected", "withdrawn"].includes(v.status)) return (
+            <details key={v.id} className="border border-line rounded-lg p-3 text-sm" data-testid={`version-${v.versionNumber}`}>
+              <summary className="cursor-pointer"><strong>v{v.versionNumber}</strong> <Badge v={v.status} /> <span className="text-xs text-muted">{f?.originalFilename} · {fmtDateTime(v.uploadedAt)}{v.reviewNotes ? ` · ${v.reviewNotes}` : ""}</span></summary>
+              <p className="text-xs text-muted mt-2">Versión conservada en el historial; no puede publicarse. SHA-256 {f?.sha256.slice(0, 16)}…</p>
+            </details>);
           return (
             <div key={v.id} className="border border-line rounded-lg p-3 space-y-2" data-testid={`version-${v.versionNumber}`}>
               <div className="flex flex-wrap gap-2 items-center">

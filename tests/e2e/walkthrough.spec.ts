@@ -39,7 +39,7 @@ test("admin + recipient end-to-end walkthrough", async ({ browser }) => {
   await admin.waitForURL(/\/admin\/documents\//);
   const docId = admin.url().split("/documents/")[1].split("?")[0];
   // wait for the worker (sandboxed conversion)
-  await expect(async () => { await admin.reload(); await expect(admin.getByTestId("version-1")).toContainText("in_review"); }).toPass({ timeout: 90_000 });
+  await expect(async () => { await admin.reload(); await expect(admin.getByTestId("version-1")).toContainText("En revisión"); }).toPass({ timeout: 90_000 });
   await shot(admin, "02-document-in-review");
   const v1 = admin.getByTestId("version-1");
   if (await v1.getByRole("button", { name: /Liberar SIN antivirus/ }).count()) { await v1.getByRole("button", { name: /Liberar SIN antivirus/ }).click(); await admin.waitForURL(/msg=/); }
