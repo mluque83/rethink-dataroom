@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test --trace off",
     "typecheck": "tsc --noEmit",
-    "import:mapped": "node --conditions=react-server --import tsx scripts/import-mapped.ts"
+    "import:mapped": "node --conditions=react-server --import tsx scripts/import-mapped.ts",
+    "register:minimize": "node --conditions=react-server --import tsx scripts/minimize-register.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1166.0",
