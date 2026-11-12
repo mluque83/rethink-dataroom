@@ -1,8 +1,10 @@
-// Builds a DATA-MINIMISED shareholder register (no natural-person names) from a parsed register,
+// Builds a DATA-MINIMISED shareholder register (no shareholder names at all: natural persons and
+// companies are aggregated by holding band) from a parsed register,
 // uploads it as a REDACTED COPY linked to the original version, processes it and runs the
 // redaction verifier with every natural-person name as a forbidden term. Never publishes:
 // approval, manual attestation and publication remain explicit admin actions.
-//   npm run register:minimize -- <parsed.json> <ORIGINAL_DOC_REF> <out.pdf>
+//   npm run register:minimize -- <parsed.json> <ORIGINAL_DOC_REF> <out.pdf> [--update <MINIMISED_DOC_REF>]
+// --update adds a new version to an existing minimised copy (previous unpublished versions are rejected).
 // parsed.json: [{ rank, name, shares, pct, type: "natural" | "legal" }]  (kept outside git)
 import { config } from "dotenv";
 config({ path: process.env.ENV_FILE ?? ".env.local", quiet: true });
@@ -25,12 +27,12 @@ async function main() {
   const sorted = [...holders].sort((a, b) => b.shares - a.shares);
   const topN = (n: number) => sorted.slice(0, n).reduce((s, r) => s + r.shares, 0);
   const nat = holders.filter((r) => r.type === "natural"), leg = holders.filter((r) => r.type === "legal");
-  const band = (f: (p: number) => boolean) => { const b = nat.filter((r) => f(pct(r.shares))); return { n: b.length, s: b.reduce((x, r) => x + r.shares, 0) }; };
+  const band = (set: Row[], f: (p: number) => boolean) => { const b = set.filter((r) => f(pct(r.shares))); return { n: b.length, s: b.reduce((x, r) => x + r.shares, 0) }; };
+  const ranges: [string, (p: number) => boolean][] = [["con 5 % o más", (p) => p >= 5], ["entre 1 % y 5 %", (p) => p >= 1 && p < 5], ["con menos de 1 %", (p) => p < 1]];
   const bands = [
-    ["Personas físicas con 5 % o más", band((p) => p >= 5)],
-    ["Personas físicas entre 1 % y 5 %", band((p) => p >= 1 && p < 5)],
-    ["Personas físicas con menos de 1 %", band((p) => p < 1)],
-  ] as const;
+    ...ranges.map(([l, fn]) => [`Personas físicas ${l}`, band(nat, fn)] as const),
+    ...ranges.map(([l, fn]) => [`Personas jurídicas ${l}`, band(leg, fn)] as const),
+  ].filter(([, b]) => b.n > 0);
 
   const { db, schema } = await import("../src/server/db");
   const { eq, and } = await import("drizzle-orm");
@@ -52,10 +54,11 @@ async function main() {
     page.drawText(s, { x: o.x ?? 40, y, size: o.size ?? 9.5, font: o.font ?? f, color: o.color ?? INK });
     y -= o.dy ?? 14;
   };
-  page.drawRectangle({ x: 40, y: y - 6, width: 515, height: 22, color: rgb(0.984, 0.918, 0.8) });
-  text("BORRADOR — pendiente de revisión y aprobación por Rethink Medical", { x: 48, font: fb, size: 10, dy: 30 });
+  // No "draft" banner inside the file: review state is tracked by the data room (the version is
+  // invisible to recipients until an admin approves, attests and publishes it).
+  y -= 6;
   text("Registro de socios — versión minimizada (fase inicial)", { font: fb, size: 16, dy: 18 });
-  text("Rethink Medical, S.L. · Capital emitido · Sin datos identificativos de personas físicas", { color: GREY, dy: 26 });
+  text("Rethink Medical, S.L. · Capital emitido · Sin identificación de socios", { color: GREY, dy: 26 });
 
   text("CIFRAS DEL REGISTRO", { font: fb, size: 10.5, dy: 16 });
   for (const [k, v] of [
@@ -73,19 +76,16 @@ async function main() {
   text("Grupo", { font: fb, dy: 0 }); text("Socios", { x: 330, font: fb, dy: 0 }); text("Participaciones", { x: 390, font: fb, dy: 0 }); text("%", { x: 500, font: fb });
   const row = (a: string, n: number, s: number, bold = false) => { const fo = bold ? fb : f; text(a, { font: fo, dy: 0 }); text(String(n), { x: 330, font: fo, dy: 0 }); text(fmtN(s), { x: 390, font: fo, dy: 0 }); text(fmtP(pct(s)), { x: 500, font: fo }); };
   for (const [label, b] of bands) row(label, b.n, b.s);
-  row("Personas jurídicas", leg.length, leg.reduce((x, r) => x + r.shares, 0));
+  row("Subtotal personas físicas", nat.length, nat.reduce((x, r) => x + r.shares, 0), true);
+  row("Subtotal personas jurídicas", leg.length, leg.reduce((x, r) => x + r.shares, 0), true);
   row("Total", holders.length, total, true);
-  y -= 10;
-
-  text("PERSONAS JURÍDICAS", { font: fb, size: 10.5, dy: 16 });
-  text("Sociedad", { font: fb, dy: 0 }); text("Participaciones", { x: 390, font: fb, dy: 0 }); text("%", { x: 500, font: fb });
-  for (const r of [...leg].sort((a, b) => b.shares - a.shares)) { text(r.name, { dy: 0 }); text(fmtN(r.shares), { x: 390, dy: 0 }); text(fmtP(pct(r.shares)), { x: 500 }); }
   y -= 10;
 
   text("NOTAS", { font: fb, size: 10.5, dy: 16 });
   for (const n of [
-    "• Versión para la fase inicial: no identifica a ninguna persona física. La identidad de los socios personas físicas,",
-    "   incluidas las dos mayores participaciones, se facilitará, en su caso, en la fase de due diligence avanzada.",
+    "• Versión para la fase inicial: no identifica a ningún socio (personas físicas ni jurídicas). Las dos mayores",
+    "   participaciones corresponden a personas físicas. La identidad de los socios se facilitará, en su caso, en la",
+    "   fase de due diligence avanzada.",
     "• Refleja únicamente capital emitido; no es un cap table totalmente diluido (no incluye opciones, warrants,",
     "   convertibles ni otros derechos).",
     "• El original no indica una fecha de referencia explícita; el original señala además discrepancias de recuento",
@@ -96,7 +96,7 @@ async function main() {
   text(`Fuente: ${orig.ref} «${orig.title}», versión ${srcVersion.versionNumber}, tabla «Full register» (págs. 2-4).`, { size: 7.8, color: GREY, dy: 11 });
   text(`Generado el ${new Date().toISOString().slice(0, 10)} por agregación aritmética; ${holders.length} socios y ${fmtN(total)} participaciones cuadran con el total del original.`, { size: 7.8, color: GREY });
   pdf.setTitle("Registro de socios — versión minimizada"); pdf.setAuthor("Rethink Medical, S.L."); pdf.setProducer("Rethink Medical data room"); pdf.setCreator("Rethink Medical data room");
-  pdf.setSubject("Sin datos identificativos de personas físicas"); pdf.setKeywords([]);
+  pdf.setSubject("Sin identificación de socios"); pdf.setKeywords([]);
   const bytes = Buffer.from(await pdf.save());
   await fs.writeFile(out, bytes, { mode: 0o600 });
 
@@ -105,19 +105,33 @@ async function main() {
   const { processVersion } = await import("../src/server/documents/pipeline");
   const { verifyRedaction } = await import("../src/server/documents/redaction");
   const admin = (await db().query.user.findFirst({ where: eq(schema.user.role, "admin") }))!;
-  const copy = await createDocument({ userId: admin.id }, {
-    title: "Registro de socios — versión minimizada (sin personas físicas)", sectionId: orig.sectionId, folderId: orig.folderId,
+  const ui = process.argv.indexOf("--update");
+  const existing = ui > 0 ? await db().query.documents.findFirst({ where: eq(schema.documents.ref, process.argv[ui + 1]) }) : undefined;
+  if (ui > 0 && (!existing || existing.redactedFromVersionId !== srcVersion.id)) throw new Error("--update target is not a redacted copy of this source version");
+  const { rejectVersion } = await import("../src/server/documents/library");
+  if (existing) {
+    for (const old of await db().select().from(schema.documentVersions).where(eq(schema.documentVersions.documentId, existing.id))) {
+      if (["in_review", "approved", "conversion_failed"].includes(old.status)) await rejectVersion({ userId: admin.id }, old.id, "Sustituida por una versión que agrupa también a las personas jurídicas");
+    }
+  }
+  const copy = existing ?? await createDocument({ userId: admin.id }, {
+    title: "Registro de socios — versión minimizada (sin identificación de socios)", sectionId: orig.sectionId, folderId: orig.folderId,
     confidentiality: "confidential", validityStatus: "pending_verification", source: `Generado desde ${orig.ref} v${srcVersion.versionNumber}`,
     notes: "BORRADOR generado automáticamente para la fase inicial (decisión del administrador: opción b). Revisar contenido y nombres de sociedades que pudieran identificar a una persona; aprobar y atestar antes de publicar.",
     tags: ["cap table", "minimizado"],
   }, { kind: "redacted", redactedFromVersionId: srcVersion.id });
-  const { version } = await uploadVersion({ userId: admin.id }, copy.id, "registro-socios-minimizado.pdf", bytes, { changeSummary: "versión minimizada generada" });
+  if (existing) {
+    const { updateDocumentMeta } = await import("../src/server/documents/library");
+    await updateDocumentMeta({ userId: admin.id }, existing.id, { title: "Registro de socios — versión minimizada (sin identificación de socios)" });
+  }
+  const { version } = await uploadVersion({ userId: admin.id }, copy.id, "registro-socios-minimizado.pdf", bytes,
+    { changeSummary: existing ? "Agrupa también a las personas jurídicas por tramos (sin nombres de socios)" : "versión minimizada generada" });
   await processVersion(version.id);
   const v = await db().query.documentVersions.findFirst({ where: eq(schema.documentVersions.id, version.id) });
   if (v?.scanStatus === "not_configured" && process.env.APP_ENV !== "production") await releaseUnscannedDev({ userId: admin.id }, version.id);
   // forbidden terms: every natural-person name (full name and its last two words)
   const terms = new Set<string>();
-  for (const r of rows.filter((x) => x.type === "natural")) {
+  for (const r of rows) { // every shareholder name (natural and legal persons) must be absent
     terms.add(r.name);
     const w = r.name.split(/\s+/);
     if (w.length >= 3) terms.add(w.slice(-2).join(" "));
