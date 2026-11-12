@@ -19,14 +19,23 @@ Internet ─HTTPS─► Caddy (TLS automático) ─► Next.js (127.0.0.1:3000) 
    - crear usuario `dataroom` (sin privilegios de superusuario) y base `dataroom`.
 3. **Object Storage**: bucket privado `rethink-dataroom-prod` en `fr-par`, sin acceso público, con versionado y cifrado del lado servidor. Crear una clave API **limitada a ese bucket**.
 4. **Servidor (Instance)** Ubuntu 24.04, 4 vCPU / 8 GB RAM (LibreOffice + OCR), disco cifrado si el tipo lo permite, acceso solo por clave SSH y grupo de seguridad con 22 (restringido a vuestra IP), 80 y 443.
-5. **Correo transaccional (TEM)**: dar de alta el dominio `rethinkmedical.es` y crear credenciales SMTP.
+5. **Correo transaccional (TEM)**: dar de alta el dominio **`dataroom.rethinkmedical.es`** (no el raíz) y crear credenciales SMTP.
 
-## 2. DNS de rethinkmedical.es
-| Registro | Valor |
-|---|---|
-| `A dataroom` (y `AAAA` si hay IPv6) | IP pública del servidor |
-| TXT SPF, TXT DKIM | los que indique el proveedor de correo |
-| TXT `_dmarc` | `v=DMARC1; p=quarantine; rua=mailto:…` (ajustar) |
+## 2. DNS de rethinkmedical.es (gestionado en Piensa Solutions)
+**No se modifica ningún registro existente** (correo de Google Workspace, SPF raíz, DKIM existentes, web en la raíz, subdominio `notify`).
+Todo el data room — web y correo — usa el subdominio `dataroom`, para que el MX que exige el proveedor de correo
+no interfiera con el correo corporativo. Remitente: `no-reply@dataroom.rethinkmedical.es`.
+
+| Nombre | Tipo | Valor | Cuándo |
+|---|---|---|---|
+| `dataroom` | A (y AAAA si hay IPv6) | IP pública del servidor | al crear el servidor |
+| `dataroom` | TXT | `v=spf1 include:_spf.tem.scaleway.com -all` | al dar de alta el dominio en TEM |
+| `<id>._domainkey.dataroom` | TXT | valor DKIM generado por Scaleway | al dar de alta el dominio en TEM |
+| `dataroom` | MX | el que indique la consola de Scaleway | al dar de alta el dominio en TEM |
+| `_dmarc.dataroom` | TXT | `v=DMARC1; p=quarantine; adkim=s; aspf=s; rua=mailto:<buzón de informes>` | tras validar SPF/DKIM |
+
+Recomendación aparte (fuera del data room): si el dominio raíz no tiene DMARC, empezar con `v=DMARC1; p=none; rua=mailto:…` para observar
+qué servicios envían en vuestro nombre (Google, el servicio con DKIM `1735027938237`, Lovable) antes de endurecer la política.
 
 ## 3. Instalación en el servidor (≈ 20 min)
 ```bash
