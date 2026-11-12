@@ -6,7 +6,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ENV_FILE="${ENV_FILE:-.env.local}"
-set -a; . "./$ENV_FILE"; set +a
+case "$ENV_FILE" in /*) ;; *) ENV_FILE="./$ENV_FILE";; esac
+set -a; . "$ENV_FILE"; set +a
 OUT="${1:-backups/$(date -u +%Y%m%dT%H%M%SZ)}"
 umask 077; mkdir -p "$OUT"
 PGBIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)"

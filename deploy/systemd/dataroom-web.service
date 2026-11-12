@@ -1,0 +1,21 @@
+[Unit]
+Description=Rethink Medical data room — web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=dataroom
+Group=dataroom
+WorkingDirectory=/opt/dataroom/app
+EnvironmentFile=/etc/dataroom/env
+ExecStart=/usr/bin/npx next start -H 127.0.0.1 -p 3000
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dataroom/app/.next
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

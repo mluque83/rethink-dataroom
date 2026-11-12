@@ -1,0 +1,30 @@
+# Reverse proxy with automatic HTTPS (Let's Encrypt) for the data room.
+# Caddy does not trust incoming X-Forwarded-For from clients by default (no trusted_proxies),
+# so the app sees the real client IP set by Caddy.
+dataroom.rethinkmedical.es {
+	encode zstd gzip
+	request_body {
+		max_size 110MB
+	}
+	header {
+		-Server
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+	}
+	reverse_proxy 127.0.0.1:3000
+	log {
+		output file /var/log/caddy/dataroom-access.log
+		# never log query strings or cookies with document identifiers in plain text logs
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete d
+					delete v
+					delete vs
+				}
+				request>headers>Cookie delete
+				request>headers>Authorization delete
+			}
+		}
+	}
+}

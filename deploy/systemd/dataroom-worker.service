@@ -1,0 +1,19 @@
+[Unit]
+Description=Rethink Medical data room — document worker (antivirus, conversion, rendering)
+After=network-online.target clamav-daemon.service
+Wants=network-online.target
+
+[Service]
+User=dataroom
+Group=dataroom
+WorkingDirectory=/opt/dataroom/app
+EnvironmentFile=/etc/dataroom/env
+ExecStart=/usr/bin/node --conditions=react-server --import tsx scripts/worker.ts
+Restart=on-failure
+# bubblewrap needs user namespaces, so NoNewPrivileges/ProtectSystem are not set here;
+# isolation of untrusted files is done per job by bwrap (no network, read-only system) + prlimit.
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

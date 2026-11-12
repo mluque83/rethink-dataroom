@@ -16,7 +16,7 @@ const schema = z.object({
   S3_REGION: z.string().default("eu-west-1"),
   S3_ENDPOINT: z.string().optional(),
   S3_FORCE_PATH_STYLE: bool,
-  S3_SSE: z.enum(["AES256", "aws:kms", "none"]).default("AES256"),
+  S3_SSE: z.enum(["AES256", "aws:kms", "bucket-default", "none"]).default("AES256"),
   S3_SSE_KMS_KEY_ID: z.string().optional(),
   EMAIL_PROVIDER: z.enum(["dev", "smtp"]).default("dev"),
   EMAIL_FROM: z.string().default("Rethink Medical Data Room <dataroom@example.invalid>"),

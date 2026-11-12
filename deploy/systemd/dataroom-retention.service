@@ -1,0 +1,9 @@
+[Unit]
+Description=Rethink Medical data room — retention policy
+
+[Service]
+Type=oneshot
+User=dataroom
+WorkingDirectory=/opt/dataroom/app
+EnvironmentFile=/etc/dataroom/env
+ExecStart=/usr/bin/node --conditions=react-server --import tsx scripts/retention.ts

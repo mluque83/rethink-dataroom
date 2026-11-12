@@ -7,7 +7,7 @@ import { assertSafeKey } from "./index";
 
 export interface S3Options {
   bucket: string; region: string; endpoint?: string; forcePathStyle: boolean;
-  sse: "AES256" | "aws:kms" | "none"; kmsKeyId?: string;
+  sse: "AES256" | "aws:kms" | "bucket-default" | "none"; kmsKeyId?: string;
 }
 
 /** Private S3-compatible bucket. Objects are written without ACLs and with server-side encryption. */
@@ -22,7 +22,7 @@ export class S3Storage implements ObjectStorage {
     assertSafeKey(key);
     await this.client.send(new PutObjectCommand({
       Bucket: this.o.bucket, Key: key, Body: body, ContentType: contentType,
-      ...(this.o.sse === "none" ? {} : { ServerSideEncryption: this.o.sse }),
+      ...(this.o.sse === "none" || this.o.sse === "bucket-default" ? {} : { ServerSideEncryption: this.o.sse }),
       ...(this.o.sse === "aws:kms" && this.o.kmsKeyId ? { SSEKMSKeyId: this.o.kmsKeyId } : {}),
     }));
   }
@@ -56,7 +56,7 @@ export class S3Storage implements ObjectStorage {
     try {
       const enc = await this.client.send(new GetBucketEncryptionCommand({ Bucket: this.o.bucket }));
       details.defaultEncryption = enc.ServerSideEncryptionConfiguration?.Rules?.map((r) => r.ApplyServerSideEncryptionByDefault?.SSEAlgorithm).join(",") ?? "none";
-    } catch { details.defaultEncryption = "unknown/not configured"; }
+    } catch { details.defaultEncryption = "unknown/not configured"; if (this.o.sse === "bucket-default") ok = false; }
     try {
       const pab = await this.client.send(new GetPublicAccessBlockCommand({ Bucket: this.o.bucket }));
       const c = pab.PublicAccessBlockConfiguration;

@@ -8,6 +8,7 @@ Data room privado para inversores, asesores y socios estratégicos: acceso indiv
 - [Arquitectura, modelo de datos, matriz de autorización y estados](docs/ARCHITECTURE.md)
 - [Guía breve para administradores](docs/ADMIN-GUIDE.md)
 - [Copias de seguridad y restauración](docs/BACKUP-RESTORE.md)
+- [Despliegue en producción (dataroom.rethinkmedical.es)](docs/DEPLOYMENT.md)
 - [Pruebas ejecutadas y resultados](docs/TESTING.md)
 - [Limitaciones conocidas](docs/LIMITATIONS.md) · [Pendientes para producción](docs/PRODUCTION-CHECKLIST.md)
 - [Seguimiento del trabajo (decisiones, avances, pendientes)](PROGRESS.md)

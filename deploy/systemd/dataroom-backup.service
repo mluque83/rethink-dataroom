@@ -1,0 +1,9 @@
+[Unit]
+Description=Rethink Medical data room — encrypted backup
+
+[Service]
+Type=oneshot
+User=dataroom
+WorkingDirectory=/opt/dataroom/app
+EnvironmentFile=/etc/dataroom/env
+ExecStart=/opt/dataroom/app/deploy/backup-encrypted.sh
